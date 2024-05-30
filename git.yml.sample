@@ -1,0 +1,8 @@
+user:
+  name: John Doe
+  email: john.doe@mail.com
+repos:
+  - https://github.com/user/repo1.git
+  - https://github.com/user/repo2.git
+  - https://github.com/user/repo3.git
+

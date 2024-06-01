@@ -36,7 +36,7 @@ func main() {
 	userEmail := flag.String("email", "", "User email to set in the Git commit history")
 	include := flag.String("include", "", "Exclude repositories that contain this string")
 	exclude := flag.String("exclude", "", "Exclude repositories that contain this string")
-	tokenenvar := flag.String("tokenEnvVar", "GITHUB_TOKEN", "Environment variable name containing the GitHub token")
+	tokenEnvar := flag.String("token-envar", "GITHUB_TOKEN", "Environment variable name containing the GitHub token")
 
 	flag.Parse()
 
@@ -44,13 +44,13 @@ func main() {
 		log.Fatalf("Error: Either genyaml or do flag must be set, but not both")
 	}
 
-	token := os.Getenv(*tokenenvar)
+	token := os.Getenv(*tokenEnvar)
 	if token == "" {
-		log.Fatalf("Error: No GitHub token found in environment variable %s", *tokenenvar)
+		log.Fatalf("Error: No GitHub token found in environment variable %s", *tokenEnvar)
 	}
 
 	if *genyaml {
-		genYaml(*userName, *userEmail, *include, *exclude, *tokenenvar)
+		genYaml(*userName, *userEmail, *include, *exclude, *tokenEnvar)
 		return
 	}
 
@@ -59,7 +59,7 @@ func main() {
 	}
 }
 
-func genYaml(userName, userEmail, include, exclude, tokenenvar string) {
+func genYaml(userName, userEmail, include, exclude, tokenEnvar string) {
 	stop := make(chan bool)
 	go showProgress(stop)
 
@@ -67,7 +67,7 @@ func genYaml(userName, userEmail, include, exclude, tokenenvar string) {
 		stop <- true
 	}()
 
-	repos, err := getRepos(include, exclude, tokenenvar)
+	repos, err := getRepos(include, exclude, tokenEnvar)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -117,10 +117,10 @@ func genYaml(userName, userEmail, include, exclude, tokenenvar string) {
 // If an exclude string is provided, any repository whose name contains the exclude string is omitted from the results.
 // If both include and exclude strings are provided, the exclude string takes precedence over the include string.
 // The function returns a slice of repository names in SSH format and any error encountered during the process.
-func getRepos(include, exclude, tokenenvar string) ([]string, error) {
+func getRepos(include, exclude, tokenEnvar string) ([]string, error) {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: os.Getenv(tokenenvar)},
+		&oauth2.Token{AccessToken: os.Getenv(tokenEnvar)},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 

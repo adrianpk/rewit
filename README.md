@@ -5,62 +5,92 @@
 ## Features
 
 - Reads an input file in YAML format containing user information and a list of Git repository URLs.
+- Generates the input file automatically by fetching repositories from GitHub based on specified criteria.
 - Clones each repository.
 - Rewrites the commit history to update the author and committer information.
 - Force-pushes the changes back to the original repository.
 - Allows overriding the input file, user name, and email via command-line flags.
 
+## Prerequisites
+
+- Git should be installed and accessible in your PATH.
+- An environment variable containing your GitHub token should be set up. The default variable is `GITHUB_TOKEN`, but this can be overridden with a command-line flag.
+- SSH key authentication should be active in the terminal where you run the tool.
+
 ## Usage
 
-1. **Prepare Input File:**
-   Create an input file named `rewit.yml` in the following YAML format:
-   ```yaml
-   user:
-     name: John Doe
-     email: john.doe@mail.com
-   repos:
-     - https://github.com/user/repo1.git
-     - https://github.com/user/repo2.git
+The tool works in two main steps:
+
+1. **Generate Configuration File**:
+   The initial step generates a configuration file (`rewit.yml`) containing user information and a list of repositories associated with the GitHub token.
+
+   ```shell
+   rewit -genyaml -name="John Doe" -email="john.doe@mail.com"
    ```
 
-2. **Run the Tool:**
-   Execute the tool without an input file as an argument:
-   ```sh
-   rewit 
-   ```
-   There should be a `rewit.yml` file in the dir you are executing the command.
+   This command will:
+   - Use the provided name and email for the new commit history.
+   - Retrieve the list of repositories associated with the authenticated user.
+   - Create a `rewit.yml` file with the user information and repository URLs.
 
-   To specify a different input file:
-   ```sh
-   rewit -file=anotherfile.yml
-   ```
+   Additional flags:
+   - `-include="substring"`: Only include repositories containing this substring.
+   - `-exclude="substring"`: Exclude repositories containing this substring (takes precedence over include).
+   - `-tokenEnvVar="MY_GITHUB_TOKEN"`: Use a different environment variable for the GitHub token.
 
-   To override the user name and email via flags:
-   ```sh
-   rewit -name="Jane Doe" -email="john.doe@mail.com"
-   ```
+2. **Process Repositories**:
+   After generating and potentially editing the `rewit.yml` file, execute the tool to rewrite commit history.
 
-   Combination of different input file and overriding user name and email:
-   ```sh
-   rewit -file=anotherfile.yml -name="Jane Doe" -email="john.doe@mail.com"
+   ```shell
+   rewit -do
    ```
 
-## Example
+   This command will:
+   - Read the `rewit.yml` file.
+   - Clone each repository listed.
+   - Rewrite the commit history to update the author and committer information.
+   - Force-push the changes back to the original repository.
 
-To illustrate how to use the tool, let's say we have an input file `rewit.yml` with the following contents:
+## Configuration File Format
+
+The configuration file (`rewit.yml`) is generated in the following YAML format:
 
 ```yaml
 user:
   name: John Doe
   email: john.doe@mail.com
 repos:
-  - https://github.com/user/repo1.git
-  - https://github.com/user/repo2.git
+  - git@github.com:user/repo1
+  - git@github.com:user/repo2
 ```
 
-Running the tool with this input file will clone the repositories listed and update the author and committer information to "John Doe" and "john.doe@mail.com".
+## Example
+
+1. **Generate Configuration File**:
+   ```shell
+   rewit -genyaml -name="Jane Doe" -email="jane.doe@mail.com" -include="project" -exclude="archive"
+   ```
+
+   This will generate a `rewit.yml` file including repositories that contain "project" in their names and excluding those with "archive".
+
+2. **Edit Configuration File** (Optional):
+   Open `rewit.yml` and manually remove any repositories you do not want to process.
+
+3. **Process Repositories**:
+   ```shell
+   rewit -do
+   ```
+
+   This will rewrite the commit history for the repositories listed in `rewit.yml`.
 
 ## Notes
 
-- Git should be installed and accessible in your PATH.
-- Make sure you have permission to push changes to the repositories listed in the input file.
+- Ensure that the user token has permission to push changes to the repositories listed in the configuration file.
+- The tool requires console SSH key authentication for pushing changes.
+- Please note that the tool cannot operate on archived repositories. If you need to update an archived repository, you must unarchive it first.
+
+- **Warning**: Rewriting commit history can have significant implications, especially in repositories with multiple collaborators. It is recommended to use this tool only on personal repositories where you are the sole collaborator.
+
+## Testing and Future Development
+
+- The tool has been successfully used for personal purposes but still requires some tests.

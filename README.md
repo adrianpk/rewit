@@ -85,7 +85,6 @@ repos:
 
 ## Notes
 
-- Ensure that the user token has permission to push changes to the repositories listed in the configuration file.
 - The tool requires console SSH key authentication for pushing changes.
 - Please note that the tool cannot operate on archived repositories. If you need to update an archived repository, you must unarchive it first.
 

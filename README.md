@@ -36,7 +36,7 @@ The tool works in two main steps:
    Additional flags:
    - `-include="substring"`: Only include repositories containing this substring.
    - `-exclude="substring"`: Exclude repositories containing this substring (takes precedence over include).
-   - `-token-envar="MY_GITHUB_TOKEN"`: Use a different environment variable for the GitHub token.
+   - `-token-envar="GITHUB_TOKEN"`: Use a different environment variable for the GitHub token.
 
 2. **Process Repositories**:
    After generating and potentially editing the `rewit.yml` file, execute the tool to rewrite commit history.

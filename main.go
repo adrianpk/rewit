@@ -16,8 +16,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Config represents the structure of the input YAML file.
-type Config struct {
+// Rewit represents the structure of the input YAML file.
+type Rewit struct {
 	User  User     `yaml:"user"`
 	Repos []string `yaml:"repos"`
 }
@@ -28,38 +28,50 @@ type User struct {
 	Email string `yaml:"email"`
 }
 
+type Config struct {
+	Genyaml    bool
+	Do         bool
+	InputFile  string
+	UserName   string
+	UserEmail  string
+	Include    string
+	Exclude    string
+	TokenEnvar string
+}
+
 func main() {
-	genyaml := flag.Bool("genyaml", false, "Generate rewit.yml file")
-	do := flag.Bool("do", false, "Do the rewrite")
-	inputFile := flag.String("file", "rewit.yml", "Input YAML file containing user info and repository URLs")
-	userName := flag.String("name", "", "User name to set in the Git commit history")
-	userEmail := flag.String("email", "", "User email to set in the Git commit history")
-	include := flag.String("include", "", "Exclude repositories that contain this string")
-	exclude := flag.String("exclude", "", "Exclude repositories that contain this string")
-	tokenEnvar := flag.String("token-envar", "GITHUB_TOKEN", "Environment variable name containing the GitHub token")
+	cfg := &Config{}
+	flag.BoolVar(&cfg.Genyaml, "genyaml", false, "Generate rewit.yml file")
+	flag.BoolVar(&cfg.Do, "do", false, "Do the rewrite")
+	flag.StringVar(&cfg.InputFile, "file", "rewit.yml", "Input YAML file containing user info and repository URLs")
+	flag.StringVar(&cfg.UserName, "name", "", "User name to set in the Git commit history")
+	flag.StringVar(&cfg.UserEmail, "email", "", "User email to set in the Git commit history")
+	flag.StringVar(&cfg.Include, "include", "", "Exclude repositories that contain this string")
+	flag.StringVar(&cfg.Exclude, "exclude", "", "Exclude repositories that contain this string")
+	flag.StringVar(&cfg.TokenEnvar, "token-envar", "GITHUB_TOKEN", "Environment variable name containing the GitHub token")
 
 	flag.Parse()
 
-	if (*genyaml && *do) || (!*genyaml && !*do) {
+	if (cfg.Genyaml && cfg.Do) || (!cfg.Genyaml && !cfg.Do) {
 		log.Fatalf("Error: Either genyaml or do flag must be set, but not both")
 	}
 
-	token := os.Getenv(*tokenEnvar)
+	token := os.Getenv(cfg.TokenEnvar)
 	if token == "" {
-		log.Fatalf("Error: No GitHub token found in environment variable %s", *tokenEnvar)
+		log.Fatalf("Error: No GitHub token found in environment variable %s", cfg.TokenEnvar)
 	}
 
-	if *genyaml {
-		genYaml(*userName, *userEmail, *include, *exclude, *tokenEnvar)
+	if cfg.Genyaml {
+		genYaml(cfg)
 		return
 	}
 
-	if *do {
-		processRepos(*inputFile)
+	if cfg.Do {
+		processRepos(cfg.InputFile)
 	}
 }
 
-func genYaml(userName, userEmail, include, exclude, tokenEnvar string) {
+func genYaml(cfg *Config) {
 	stop := make(chan bool)
 	go showProgress(stop)
 
@@ -67,7 +79,7 @@ func genYaml(userName, userEmail, include, exclude, tokenEnvar string) {
 		stop <- true
 	}()
 
-	repos, err := getRepos(include, exclude, tokenEnvar)
+	repos, err := getRepos(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -78,26 +90,26 @@ func genYaml(userName, userEmail, include, exclude, tokenEnvar string) {
 	}
 	defer file.Close()
 
-	if userName == "" {
-		userName = "John Doe"
+	if cfg.UserName == "" {
+		cfg.UserName = "John Doe"
 	}
-	if userEmail == "" {
-		userEmail = "john.doe@mail.com"
+	if cfg.UserEmail == "" {
+		cfg.UserEmail = "john.doe@mail.com"
 	}
 
-	fmt.Printf("Using user name: %s\n", userName)
-	fmt.Printf("Using email: %s\n", userEmail)
+	fmt.Printf("Using user name: %s\n", cfg.UserName)
+	fmt.Printf("Using email: %s\n", cfg.UserEmail)
 	fmt.Printf("Processing %d repositories...\n", len(repos))
 
-	config := Config{
+	rwt := Rewit{
 		User: User{
-			Name:  userName,
-			Email: userEmail,
+			Name:  cfg.UserName,
+			Email: cfg.UserEmail,
 		},
 		Repos: repos,
 	}
 
-	data, err := yaml.Marshal(&config)
+	data, err := yaml.Marshal(&rwt)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -117,10 +129,10 @@ func genYaml(userName, userEmail, include, exclude, tokenEnvar string) {
 // If an exclude string is provided, any repository whose name contains the exclude string is omitted from the results.
 // If both include and exclude strings are provided, the exclude string takes precedence over the include string.
 // The function returns a slice of repository names in SSH format and any error encountered during the process.
-func getRepos(include, exclude, tokenEnvar string) ([]string, error) {
+func getRepos(cfg *Config) ([]string, error) {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: os.Getenv(tokenEnvar)},
+		&oauth2.Token{AccessToken: os.Getenv(cfg.TokenEnvar)},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 
@@ -143,8 +155,8 @@ func getRepos(include, exclude, tokenEnvar string) ([]string, error) {
 			fullName := repo.GetFullName()
 			fmt.Println("Evaluating", fullName)
 
-			shouldInclude := include == "" || strings.Contains(fullName, include)
-			shouldExclude := exclude != "" && strings.Contains(fullName, exclude)
+			shouldInclude := cfg.Include == "" || strings.Contains(fullName, cfg.Include)
+			shouldExclude := cfg.Exclude != "" && strings.Contains(fullName, cfg.Exclude)
 
 			if shouldInclude && !shouldExclude {
 				sshRepo := sshURL(fullName)
@@ -175,9 +187,9 @@ func sshURL(repoPath string) string {
 	return url
 }
 
-// processRepos reads a YAML configuration file, validates the user information and repository list,
+// processRepos reads a YAML cfguration file, validates the user information and repository list,
 // and initiates the process of cloning and rewriting the commit history for each repository.
-// The function takes the path to the config file as a parameter.
+// The function takes the path to the cfg file as a parameter.
 func processRepos(inputFile string) {
 	file, err := os.Open(inputFile)
 	if err != nil {
@@ -185,15 +197,15 @@ func processRepos(inputFile string) {
 	}
 	defer file.Close()
 
-	var config Config
+	var cfg Rewit
 	decoder := yaml.NewDecoder(file)
-	if err := decoder.Decode(&config); err != nil {
+	if err := decoder.Decode(&cfg); err != nil {
 		log.Fatalf("Error parsing YAML file: %v", err)
 	}
 
-	isNameEmpty := config.User.Name == ""
-	isEmailEmpty := config.User.Email == ""
-	isReposEmpty := len(config.Repos) == 0
+	isNameEmpty := cfg.User.Name == ""
+	isEmailEmpty := cfg.User.Email == ""
+	isReposEmpty := len(cfg.Repos) == 0
 
 	if isNameEmpty || isEmailEmpty || isReposEmpty {
 		log.Fatalf("You must provide a name and an email in the input file, and at least one repository URL")
@@ -201,7 +213,7 @@ func processRepos(inputFile string) {
 
 	fmt.Println("This process will clone and rewrite the commit history for the following repositories:")
 
-	for _, repo := range config.Repos {
+	for _, repo := range cfg.Repos {
 		fmt.Println(repo)
 	}
 
@@ -210,8 +222,8 @@ func processRepos(inputFile string) {
 		return
 	}
 
-	for _, repo := range config.Repos {
-		cloneAndRewrite(repo, config.User.Name, config.User.Email)
+	for _, repo := range cfg.Repos {
+		cloneAndRewrite(repo, cfg.User.Name, cfg.User.Email)
 	}
 }
 
